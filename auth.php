@@ -42,7 +42,7 @@ class auth_plugin_saml2 extends auth_plugin_base {
         'idpmetadata'     => '',
         'debug'           => 0,
         'duallogin'       => 1,
-	'customloginpage'       => 1,
+        'customloginpage'       => 0,
         'anyauth'         => 1,
         'idpattr'         => 'uid',
         'mdlattr'         => 'username',
@@ -146,24 +146,22 @@ class auth_plugin_saml2 extends auth_plugin_base {
      * All the checking happens before the login page in this hook
      */
     public function loginpage_hook() {
-        global $SESSION;
+        global $SESSION, $PAGE, $OUTPUT, $CFG;
 
         $this->log(__FUNCTION__ . ' enter');
 
-	// If customlogin page is set and the saml parameter is not 
-        // then dispaly the custom login page
-        $saml = optional_param('saml', NULL , PARAM_BOOL);
+        // If customlogin page is set and the saml parameter is not
+        // then dispaly the custom login page.
+        $saml = optional_param('saml', null , PARAM_BOOL);
         if ($this->config->customloginpage == 1 && is_null($saml)) {
-           $this->log(__FUNCTION__ . ' displaying custom login page');
-           $PAGE->set_url('/login/index.php');
-           $PAGE->set_heading($SITE->fullname);
-           echo $OUTPUT->header();
-           include($CFG->dirroot.'/auth/saml2/saml2_form.html');
-           echo $OUTPUT->footer();
-           exit();
+            $this->log(__FUNCTION__ . ' displaying custom login page');
+            $PAGE->set_url('/login/index.php');
+            $PAGE->set_heading($SITE->fullname);
+            echo $OUTPUT->header();
+            include($CFG->dirroot.'/auth/saml2/saml2_form.html');
+            echo $OUTPUT->footer();
+            exit();
         }
-
-
 
         $saml = optional_param('saml', 0, PARAM_BOOL);
 
@@ -176,7 +174,7 @@ class auth_plugin_saml2 extends auth_plugin_base {
         // If ?saml=on even when duallogin is on, go directly to IdP.
         if ($saml == 1) {
             $this->log(__FUNCTION__ . ' skipping due to query param ?saml=on');
-            //return; Seems a but to me, should trigger saml auth
+            // return; Seems a bug to me, should trigger saml auth.
         }
 
         // Check whether we've skipped saml already.
@@ -185,7 +183,7 @@ class auth_plugin_saml2 extends auth_plugin_base {
         // preserved forcing us to the IdP.
         //
         // This isn't needed when duallogin is on because $saml will default to 0
-        // and duallogin is not part of the request
+        // and duallogin is not part of the request.
         if ((isset($SESSION->saml) && $SESSION->saml == 0)) {
             $this->log(__FUNCTION__ . ' skipping due to no sso session');
             return;
