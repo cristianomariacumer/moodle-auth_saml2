@@ -151,15 +151,17 @@ class auth_plugin_saml2 extends auth_plugin_base {
         $this->log(__FUNCTION__ . ' enter');
 
         // If customlogin page is set and the saml parameter is not
+        // and we didn't dispaly the custom login before
         // then dispaly the custom login page.
         $saml = optional_param('saml', null , PARAM_BOOL);
-        if ($this->config->customloginpage == 1 && is_null($saml)) {
+        if ($this->config->customloginpage == 1 && is_null($saml) && isset($SESSION->customsamllogin) == false) {
             $this->log(__FUNCTION__ . ' displaying custom login page');
             $PAGE->set_url('/login/index.php');
             $PAGE->set_heading($SITE->fullname);
             echo $OUTPUT->header();
             include($CFG->dirroot.'/auth/saml2/saml2_form.html');
             echo $OUTPUT->footer();
+            $SESSION->customsamllogin = true;
             exit();
         }
 
@@ -437,6 +439,7 @@ class auth_plugin_saml2 extends auth_plugin_base {
             $file = $this->certdir . $this->spname . '.xml';
             @unlink($file);
         }
+        return true;
     }
 
     /**
