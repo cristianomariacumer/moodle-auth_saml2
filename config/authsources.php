@@ -41,7 +41,8 @@ $config = array(
         'privatekey' => $saml2auth->spname . '.pem',
         'privatekey_pass' => get_site_identifier(),
         'certificate' => $saml2auth->spname . '.crt',
-	'sign.logout' => true,
+        'sign.logout' => true,
+        'signature.algorithm' => 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
     ),
 );
 
