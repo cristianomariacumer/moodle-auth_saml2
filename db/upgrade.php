@@ -72,6 +72,48 @@ function xmldb_auth_saml2_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2016031701, 'auth', 'saml2');
     }
 
+    if ($oldversion < 2016080302) {
+        // Update plugin configuration settings from auth_saml2 to auth/saml2.
+        $currentconfig = get_config('auth_saml2');
+
+        // Remove old config.
+        $rs = $DB->get_recordset_select('config_plugins', 'plugin = ?', array('auth_saml2'));
+        foreach ($rs as $record) {
+            if ($record->name != 'version') {
+                $DB->delete_records('config_plugins', array('id' => $record->id));
+            }
+        }
+        $rs->close();
+
+        // Set new config.
+        foreach ($currentconfig as $key => $value) {
+            set_config($key, $value, 'auth/saml2');
+        }
+
+        // Saml2 savepoint reached.
+        upgrade_plugin_savepoint(true, 2016080302, 'auth', 'saml2');
+    }
+
+    if ($oldversion < 2017051800) {
+        // Update plugin configuration settings from auth/saml2 to auth_saml2.
+        $currentconfig = (array)get_config('auth_saml2');
+        $oldconfig = $DB->get_records('config_plugins', ['plugin' => 'auth/saml2']);
+
+        // Convert old config items to new.
+        foreach ($oldconfig as $item) {
+            $DB->delete_records('config_plugins', array('id' => $item->id));
+            set_config($item->name, $item->value, 'auth_saml2');
+        }
+
+        // Overwrite with any config that was created in the new format.
+        foreach ($currentconfig as $key => $value) {
+            set_config($key, $value, 'auth_saml2');
+        }
+
+        // Saml2 savepoint reached.
+        upgrade_plugin_savepoint(true, 2017051800, 'auth', 'saml2');
+    }
+
     return true;
 }
 

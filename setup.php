@@ -23,8 +23,13 @@
  */
 
 require_once(dirname(dirname(dirname(__FILE__))).'/config.php');
-require_once(dirname(__FILE__).'/autoload.php');
+require_once(dirname(__FILE__).'/_autoload.php');
 require_once("$CFG->dirroot/auth/saml2/auth.php");
+
+// Tell SSP that we are on 443 if we are terminating SSL elsewhere.
+if (isset($CFG->sslproxy) && $CFG->sslproxy) {
+      $_SERVER['SERVER_PORT'] = '443';
+}
 
 $saml2auth = new auth_plugin_saml2();
 
@@ -61,6 +66,11 @@ SimpleSAML_Configuration::setConfigDir("$CFG->dirroot/auth/saml2/config");
 function create_certificates($saml2auth, $dn = false, $numberofdays = 3650) {
     global $CFG, $SITE;
 
+    $opensslargs = array();
+    if (array_key_exists('OPENSSL_CONF', $_SERVER)) {
+        $opensslargs['config'] = $_SERVER['OPENSSL_CONF'];
+    }
+
     if ($dn == false) {
         // These are somewhat arbitrary and aren't really seen except inside
         // the auto created certificate used to sign saml requests.
@@ -68,28 +78,30 @@ function create_certificates($saml2auth, $dn = false, $numberofdays = 3650) {
             'commonName' => 'moodle',
             'countryName' => 'AU',
             'localityName' => 'moodleville',
-            'emailAddress' => $CFG->supportemail ? $CFG->supportemail : $CFG->noreplyaddress,
-            // TODO \core_user::get_support_user().
-            'organizationName' => $SITE->shortname,
+            'emailAddress' => get_dn_email(),
+            'organizationName' => $SITE->shortname ? $SITE->shortname : 'moodle',
             'stateOrProvinceName' => 'moodle',
             'organizationalUnitName' => 'moodle',
         );
     }
 
+    certificate_openssl_error_strings(); // Ensure existing messages are dropped
     $privkeypass = get_site_identifier();
-    $privkey = openssl_pkey_new();
-    $csr     = openssl_csr_new($dn, $privkey);
-    $sscert  = openssl_csr_sign($csr, null, $privkey, $numberofdays);
+    $privkey = openssl_pkey_new($opensslargs);
+    $csr     = openssl_csr_new($dn, $privkey, $opensslargs);
+    $sscert  = openssl_csr_sign($csr, null, $privkey, $numberofdays, $opensslargs);
     openssl_x509_export($sscert, $publickey);
+    openssl_pkey_export($privkey, $privatekey, $privkeypass, $opensslargs);
     openssl_pkey_export($privkey, $privatekey, $privkeypass);
+    $errors = certificate_openssl_error_strings();
 
     // Write Private Key and Certificate files to disk.
     // If there was a generation error with either explode.
     if (empty($privatekey)) {
-        return get_string('nullprivatecert', 'auth_saml2');
+        return get_string('nullprivatecert', 'auth_saml2') . $errors;
     }
     if (empty($publickey)) {
-        return get_string('nullpubliccert', 'auth_saml2');
+        return get_string('nullpubliccert', 'auth_saml2') . $errors;
     }
 
     if ( !file_put_contents($saml2auth->certpem, $privatekey) ) {
@@ -99,6 +111,20 @@ function create_certificates($saml2auth, $dn = false, $numberofdays = 3650) {
         return get_string('nullpubliccert', 'auth_saml2');
     }
 
+}
+
+/**
+ * Collect and render a list of OpenSSL error messages.
+ *
+ * @return string
+ */
+function certificate_openssl_error_strings() {
+    $errors = array();
+    while ($error = openssl_error_string()) {
+        $errors[] = $error;
+    }
+
+    return html_writer::alist($errors);
 }
 
 /**
@@ -130,5 +156,27 @@ function pretty_print($arr) {
     }
     $retstr .= '</table>';
     return $retstr;
+}
+
+/**
+ * Return email for create_certificates function.
+ *
+ * @return string
+ */
+function get_dn_email() {
+    global $CFG;
+
+    $supportuser = \core_user::get_support_user();
+
+    if ($supportuser && !empty($supportuser->email)) {
+        $email = $supportuser->email;
+    } else if (isset($CFG->noreplyaddress) && !empty($CFG->noreplyaddress)) {
+        $email = $CFG->noreplyaddress;
+    } else {
+        // Make sure that we get at least something to prevent failing of openssl_csr_new.
+        $email = 'moodle@example.com';
+    }
+
+    return $email;
 }
 

@@ -1,5 +1,5 @@
-<a href="https://travis-ci.org/CatalystIT-AU/moodle-auth_saml2">
-<img src="https://travis-ci.org/CatalystIT-AU/moodle-auth_saml2.svg?branch=master">
+<a href="https://travis-ci.org/catalyst/moodle-auth_saml2">
+<img src="https://travis-ci.org/catalyst/moodle-auth_saml2.svg?branch=master">
 </a>
 
 https://moodle.org/plugins/auth_saml2
@@ -15,7 +15,10 @@ https://moodle.org/plugins/auth_saml2
 * [Features](#features)
 * [Installation](#installation)
 * [Testing](#testing)
+* [Debugging](#debugging)
+* [Gotchas](#gotchas)
 * [Other SAML plugins](#other-saml-plugins)
+* [Support](#support)
 * [Warm thanks](#warm-thanks)
 
 What is this?
@@ -44,6 +47,8 @@ configuration from Moodle configuration. In the future we should be able to
 swap to a different internal SAML implementation and the plugin GUI shouldn't
 need to change at all.
 
+* SimpleSAMLphp version 1.14.10
+
 
 Features
 --------
@@ -64,33 +69,38 @@ Features not yet implemented:
 Installation
 ------------
 
-1. Install the plugin the same as any standard moodle plugin either via the
+1. Install and enable php-mcrypt. On debian / ubuntu this may look like
+
+   ```sh
+   sudo apt-get install php5-mcrypt
+   sudo php5enmod mcrypt 
+   sudo service apache2 restart
+   ```
+   
+2. Install the plugin the same as any standard moodle plugin either via the
 Moodle plugin directory, or you can use git to clone it into your source:
 
-     git clone git@github.com:CatalystIT-AU/moodle-auth_saml2.git auth/saml2
+   ```sh
+   git clone git@github.com:catalyst/moodle-auth_saml2.git auth/saml2
+   ```
 
-    Or install via the Moodle plugin directory:
+   Or install via the Moodle plugin directory:
     
-     https://moodle.org/plugins/auth_saml2
+   https://moodle.org/plugins/auth_saml2
 
-2. Then run the Moodle upgrade
-3. If your IdP has a publicly available XML descriptor, copy this url into
-   the SAML2 auth config settings page
-4. If your IdP requires whitelisting each SP then in the settings page is
+3. Then run the Moodle upgrade
+
+4. If your IdP has a publicly available XML descriptor, copy it's url into
+   the SAML2 auth config settings page. Otherwise copy the XML verbatum into
+   the settings textarea instead.
+   
+5. If your IdP requires whitelisting each SP then in the settings page is
    links to download the XML, or you can provide that url to your IdP
    administrator.
 
 For most simple setups this is enough to get authentication working, there are
 many more settings to define how to handle new accounts, dual authentication,
 and to easily debug the plugin if things are not working.
-
-If you have issues please log them in github here:
-
-https://github.com/CatalystIT-AU/moodle-auth_saml2/issues
-
-Or if you want paid support please contact Catalyst IT Australia:
-
-https://www.catalyst-au.net/contact-us
 
 
 Testing
@@ -102,6 +112,8 @@ This plugin has been tested against:
 * openidp.feide.no
 * testshib.org
 * An AAF instance of Shibboleth
+* OpenAM (Sun / Oracle)
+* Microsoft ADFS
 
 To configure this against testshib you will need a moodle which is publicly
 accessible over the internet. Turn on the SAML2 plugin and then configure it:
@@ -116,6 +128,93 @@ Home ► Site administration ► Plugins ► Authentication ► SAML2
 6. Upload that file to: https://www.testshib.org/register.html
 7. Logout and login, you should see 'TestShib Test IdP' as an alternate login method
    and be able to login via the example credentials.
+
+Debugging
+---------
+
+If you are having any issues, turn on debugging inside the SAML2 auth plugin, as well
+as turning on the moodle level debugging. This will give in depth debugging on the SAML
+xml and errors, as well as stack traces. Please include this in any github issue you
+create if you are having trouble.
+
+There is also a standalone test page which authenticates but isn't a 'moodle' page. All
+this page does is echo the saml attributes which have been provided by the IDP. This can
+be very handy for setting up the mappings, ie for when the IDP might be providing the
+right attributes but under an unexpected key name.
+
+```
+/auth/saml2/test.php
+```
+
+Gotchas
+-------
+
+**OpenAM**
+
+If you are getting signature issues with OpenAM then you may need to manually
+yank out the contents of the ds:X509Certificate element into a file and then
+import it into OpenAM's certificate store:
+
+```bash
+$ cat moodle.edu.crt 
+-----BEGIN CERTIFICATE-----
+thesuperlongcertificatestringgoeshere=
+-----END CERTIFICATE-----
+$ keytool -import -trustcacerts -alias moodle.edu -file moodle.edu.crt -keystore keystore.jks
+```
+
+Then follow the prompts and restart OpenAM.
+
+**Certificate Locking**
+
+It is only possible to unlock the certificates via the command line.
+These certificates are located in the $CFG->dataroot/saml2 directory.
+
+To unlock the certificates please restore the write permissions to the required files.
+```bash
+$ cd $CFG->dataroot/saml2
+$ chmod 0660 site.example.crt
+$ chmod 0660 site.example.pem
+```
+
+**OpenSSL errors during certificate regeneration**
+
+Some environments, particularly Windows-based, may not provide an OpenSSL
+configuration file at the default location, producing errors like the
+following when regenerating certificates:
+
+```
+error:02001003:system library:fopen:No such process
+error:2006D080:BIO routines:BIO_new_file:no such file
+error:0E064002:configuration file routines:CONF_load:system lib
+```
+
+To work around this, set the `OPENSSL_CONF` environment variable to the location
+of [`openssl.cnf`](https://www.openssl.org/docs/manmaster/man5/config.html)
+within your environment.
+
+
+**OKTA configuration**
+
+Okta has some weird names for settings which are confusing, this may help decipher them:
+
+|Okta name|Sane name|Value|
+|---|---|---|
+|Single sign on URL|ACS URL|`https://example.com/auth/saml2/sp/saml2-acs.php/example.com`|
+|Audience URI|Entity ID|`https://example.com/auth/saml2/sp/metadata.php`|
+|Enable Single Log Out|Enable Single Log Out|True|
+|Single Logout URL|Single Logout URL|`https://example.com/auth/saml2/sp/saml2-logout.php/example.com`|
+|Assertion Encryption|Assertion Encryption|Encrypted|
+
+Suggested attribute mappings:
+
+|Name|Value|
+|---|---|
+|`Login`|`user.login`|
+|`FirstName`|`user.firstName`|
+|`LastName`|`user.lastName`|
+|`Email`|`user.email`|
+
 
 
 Other SAML plugins
@@ -163,6 +262,19 @@ These are generally much easier to manage and configure as they are standalone.
 
 * This plugin, with an embedded and dynamically configured SimpleSamlPHP
   instance under the hood
+
+
+Support
+-------
+
+If you have issues please log them in github here
+
+https://github.com/catalyst/moodle-auth_saml2/issues
+
+Please note our time is limited, so if you need urgent support or want to
+sponsor a new feature then please contact Catalyst IT Australia:
+
+https://www.catalyst-au.net/contact-us
 
 
 Warm thanks

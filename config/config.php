@@ -22,10 +22,18 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+defined('MOODLE_INTERNAL') || die();
+
 global $CFG, $saml2auth;
 
-$config = array(
+// Check for https login.
+$wwwroot = $CFG->wwwroot;
+if (!empty($CFG->loginhttps)) {
+    $wwwroot = str_replace('http:', 'https:', $CFG->wwwroot);
+}
 
+$config = array(
+    'baseurlpath'       => $wwwroot . '/auth/saml2/sp/',
     'certdir'           => $saml2auth->certdir,
     'debug'             => $saml2auth->config->debug ? true : false,
     'logging.level'     => $saml2auth->config->debug ? SimpleSAML_Logger::DEBUG : SimpleSAML_Logger::ERR,
@@ -46,7 +54,7 @@ $config = array(
     'session.cookie.name'     => 'SimpleSAMLSessionID',
     'session.cookie.path'     => '/', // TODO restrict to moodle path.
     'session.cookie.domain'   => null,
-    'session.cookie.secure'   => false, // TODO.
+    'session.cookie.secure'   => !empty($CFG->cookiesecure),
     'session.cookie.lifetime' => 0,
 
     'session.phpsession.cookiename' => null,
@@ -57,7 +65,7 @@ $config = array(
 
     'enable.http_post' => false,
 
-    'metadata.sign.enable'          => true,
+    'metadata.sign.enable'          => $saml2auth->config->spmetadatasign ? true : false,
     'metadata.sign.certificate'     => $saml2auth->certcrt,
     'metadata.sign.privatekey'      => $saml2auth->certpem,
     'metadata.sign.privatekey_pass' => get_site_identifier(),
@@ -83,8 +91,4 @@ $config = array(
     // https://adfs.nmit.ac.nz/federationmetadata/2007-06/federationmetadata.xml (ADFS rotates its keys automatically every year)
     // TODO More options for post-processing of the UID - essentially we need a safer version of SSPHP's authproc.
     // A basic plugin system would be ideal as requirements here can vary wildly.
-    //
-    // TODO session.cookie.secure should use the same setting as Moodle.
-    // TODO 'Test Settings' link on Manage authentication page fails with Fatal error:
-    // require_once(): Failed opening required '/auth/saml2/autoload.php'.
 );

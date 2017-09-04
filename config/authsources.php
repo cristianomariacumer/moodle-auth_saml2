@@ -22,13 +22,22 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+defined('MOODLE_INTERNAL') || die();
+
 global $saml2auth, $CFG, $SITE;
+
+// Check for https login.
+$wwwroot = $CFG->wwwroot;
+if (!empty($CFG->loginhttps)) {
+    $wwwroot = str_replace('http:', 'https:', $CFG->wwwroot);
+}
 
 $config = array(
     $saml2auth->spname => array(
         'saml:SP',
-        'entityID' => "$CFG->wwwroot/auth/saml2/sp/metadata.php",
+        'entityID' => "$wwwroot/auth/saml2/sp/metadata.php",
         'idp' => $saml2auth->config->entityid,
+        'NameIDPolicy' => null,
         'OrganizationName' => array(
             'en' => $SITE->shortname,
         ),
@@ -41,7 +50,8 @@ $config = array(
         'privatekey' => $saml2auth->spname . '.pem',
         'privatekey_pass' => get_site_identifier(),
         'certificate' => $saml2auth->spname . '.crt',
-	'sign.logout' => true,
+        'sign.logout' => true,
+        'redirect.sign' => true,
+        'signature.algorithm' => 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
     ),
 );
-

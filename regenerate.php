@@ -23,17 +23,16 @@
  */
 
 require('setup.php');
-require('regenerate_form.php');
 
 require_login();
 require_capability('moodle/site:config', context_system::instance());
 $PAGE->set_url("$CFG->wwwroot/auth/saml2/regenerate.php");
 $PAGE->set_course($SITE);
 
-$mform = new regenerate_form();
+$mform = new \auth_saml2\form\regenerate();
 
 if ($mform->is_cancelled()) {
-    redirect("$CFG->wwwroot/admin/auth_config.php?auth=saml2");
+    redirect("$CFG->wwwroot/admin/settings.php?section=authsettingsaml2");
 }
 
 $path = $saml2auth->certdir . $saml2auth->spname . '.crt';
@@ -41,7 +40,7 @@ $error = '';
 
 if ($fromform = $mform->get_data()) {
     $dn = array(
-        'commonName' => $fromform->commonname,
+        'commonName' => substr($fromform->commonname, 0, 64),
         'countryName' => $fromform->countryname,
         'emailAddress' => $fromform->email,
         'localityName' => $fromform->localityname,
@@ -59,7 +58,7 @@ if ($fromform = $mform->get_data()) {
     @unlink($file);
 
     if (empty($error)) {
-        redirect("$CFG->wwwroot/admin/auth_config.php?auth=saml2");
+        redirect("$CFG->wwwroot/admin/settings.php?section=authsettingsaml2");
     }
 
 } else {
@@ -78,7 +77,7 @@ if ($fromform = $mform->get_data()) {
     $toform = array (
         "email" => $data['subject']['emailAddress'],
         "expirydays" => $expirydays,
-        "commonname" => $data['subject']['CN'],
+        "commonname" => substr($data['subject']['CN'], 0, 64),
         "countryname" => $data['subject']['C'],
         "localityname" => $data['subject']['L'],
         "organizationname" => $data['subject']['O'],
