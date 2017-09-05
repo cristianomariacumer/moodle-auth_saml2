@@ -220,7 +220,9 @@ class auth_plugin_saml2 extends auth_plugin_base {
      */
     public function should_login_redirect() {
         global $SESSION;
-
+	global $PAGE;
+        global $OUTPUT;
+        global $CFG;
         $this->log(__FUNCTION__ . ' enter');
 
 	// If customlogin page is set and the saml parameter is not 
