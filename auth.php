@@ -228,7 +228,7 @@ class auth_plugin_saml2 extends auth_plugin_base {
 	// If customlogin page is set and the saml parameter is not 
         // then dispaly the custom login page
         $saml = optional_param('saml', NULL , PARAM_BOOL);
-        if ($this->config->customloginpage == 1 && is_null($saml)) {
+        if ($this->config->customloginpage == 1 && is_null($saml) && $_SERVER['REQUEST_METHOD'] == 'GET'  ) {
            $this->log(__FUNCTION__ . ' displaying custom login page');
            $PAGE->set_url('/login/index.php');
            $PAGE->set_heading($SITE->fullname);
